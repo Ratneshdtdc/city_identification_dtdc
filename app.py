@@ -30,19 +30,22 @@ if st.button("Fetch Boundary"):
     centroid = geom.centroid
     m = folium.Map(location=[centroid.y, centroid.x], zoom_start=10, tiles="cartodbpositron")
 
-    # create a FeatureGroup with the boundary
-    fg = folium.FeatureGroup(name="Editable Boundary", show=True)
-    folium.GeoJson(
+    # add the OSM boundary
+    gj = folium.GeoJson(
         feature,
-        name="boundary",
+        name="Editable Boundary",
         style_function=lambda x: {"fillColor": "#blue", "color": "black", "weight": 2, "fillOpacity": 0.1},
-    ).add_to(fg)
+    ).add_to(m)
+
+    # IMPORTANT: wrap it in a LayerGroup with an id string
+    fg = folium.FeatureGroup(name="drawnItems")
+    gj.add_to(fg)
     fg.add_to(m)
 
-    # add Draw plugin: edit only existing boundary
+    # Draw plugin now references the *string* layer name, not the object
     Draw(
-        draw_options=False,  # don’t allow new shapes
-        edit_options={"featureGroup": fg}
+        draw_options=False,
+        edit_options={"featureGroup": "drawnItems"}
     ).add_to(m)
 
     st.markdown("### Drag the boundary vertices to adjust it 👇")
@@ -60,7 +63,6 @@ if st.button("Fetch Boundary"):
         st.success("Edited boundary captured ✅")
         st.json(edited)
 
-        # download button
         st.download_button(
             "Download Edited GeoJSON",
             data=json.dumps(edited),
