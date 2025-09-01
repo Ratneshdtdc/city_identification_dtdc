@@ -2,7 +2,7 @@ import streamlit as st
 import osmnx as ox
 import geopandas as gpd
 import json
-from shapely.geometry import shape, mapping
+from shapely.geometry import mapping
 from streamlit_folium import st_folium
 import folium
 from folium.plugins import Draw
@@ -26,40 +26,44 @@ if st.button("Fetch Boundary"):
         "geometry": mapping(geom)
     }
 
-    # create map centered on city
+    # center map
     centroid = geom.centroid
     m = folium.Map(location=[centroid.y, centroid.x], zoom_start=10, tiles="cartodbpositron")
 
-    # add the OSM boundary into a FeatureGroup (this is what draw plugin can edit)
-    fg = folium.FeatureGroup(name="Editable Boundary", overlay=True, control=False)
-    gj = folium.GeoJson(
+    # create a FeatureGroup with the boundary
+    fg = folium.FeatureGroup(name="Editable Boundary", show=True)
+    folium.GeoJson(
         feature,
         name="boundary",
         style_function=lambda x: {"fillColor": "#blue", "color": "black", "weight": 2, "fillOpacity": 0.1},
-    )
-    gj.add_to(fg)
+    ).add_to(fg)
     fg.add_to(m)
 
-    # make editable
-    draw = Draw(
+    # add Draw plugin: edit only existing boundary
+    Draw(
         draw_options=False,  # don’t allow new shapes
-        edit_options={"featureGroup": fg}  # allow editing existing polygon
-    )
-    draw.add_to(m)
+        edit_options={"featureGroup": fg}
+    ).add_to(m)
 
     st.markdown("### Drag the boundary vertices to adjust it 👇")
-    output = st_folium(m, width=None, height=600)
+    output = st_folium(m, width=None, height=600, key="map")
 
-    # capture edits
-    if output and "all_drawings" in output and output["all_drawings"]:
-        edited = output["all_drawings"][-1]  # last edited geojson
+    # capture edited geojson
+    edited = None
+    if output:
+        if "last_active_drawing" in output and output["last_active_drawing"]:
+            edited = output["last_active_drawing"]
+        elif "all_drawings" in output and output["all_drawings"]:
+            edited = output["all_drawings"][-1]
+
+    if edited:
+        st.success("Edited boundary captured ✅")
         st.json(edited)
 
-        # save download button
-        geojson_str = json.dumps(edited)
+        # download button
         st.download_button(
             "Download Edited GeoJSON",
-            geojson_str,
+            data=json.dumps(edited),
             file_name=f"{city.replace(',','').replace(' ','_')}_edited.geojson",
             mime="application/geo+json"
         )
